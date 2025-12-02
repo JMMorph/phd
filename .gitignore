@@ -8,6 +8,7 @@ __pycache__/
 
 # Own folders
 data/
+Notebooks/BlogTOAR1/files/
 
 # Distribution / packaging
 .Python
