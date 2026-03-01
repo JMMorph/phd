@@ -1,39 +1,39 @@
-id_parameter;cve_param;nom_param;unidades_param
-1;O3;Ozono;1
-2;NO2;Di髕ido de nitr骻eno;1
-3;NO;觴ido n韙rico;1
-4;NOx;觴idos de nitr骻eno;1
-5;CO;Mon髕ido de carbono;15
-6;SO2;Di髕ido de azufre;1
-7;PM10;Part韈ulas menores a 10 micr髆etros;2
-8;PM2.5;Part韈ulas menores a 2.5 micr髆etros;2
-9;PMco;Part韈ulas coarse;2
-10;BEN;Benceno;1
-11;TOL;Tolueno;1
-14;WSP;Velocidad del viento;3
-15;WDR;Direccion del viento;4
-16;TMP;Temperatura ambiente;5
-17;RH;Humedad relativa;6
-18;UVA;Radiaci髇 UV-A;17
-19;UVB;Radiaci髇 UV-B;7
-20;GR;Radiaci髇 global;7
-21;PAR;Radiaci髇 FA;8
-22;PA;Presi髇 Atmosf閞ica;9
-23;pH;Potencial de hidr骻eno;10
-24;PP;Precipitacion pluvial;11
-25;CE;Conductividad el閏trica;12
-26;SO4;Sulfato;13,14
-27;NO3;Nitrato;13,14
-28;Cl;Cloruro;13,14
-29;CO3;Carbonato;13,14
-30;H;Hidr骻eno;13,14
-31;NH4;Amonio;13,14
-32;Ca;Calcio;13,14
-33;Mg;Magnesio;13,14
-34;Na;Sodio;13,14
-35;K;Potasio;13,14
-36;PST;Part韈ulas suspendidas totales;2
-37;PbPST;Plomo contenido en PST;2
-38;PbPM;Plomo contenido en PM10;2
-39;ETB;Etilbenceno;1
-40;XIL;Xilenos;1
+id_param,key_param,name_param,units
+1,O3,Ozono,1
+2,NO2,Di贸xido de nitr贸geno,1
+3,NO,脫xido n铆trico,1
+4,NOx,脫xidos de nitr贸geno,1
+5,CO,Mon贸xido de carbono,15
+6,SO2,Di贸xido de azufre,1
+7,PM10,Part铆culas menores a 10 micr贸metros,2
+8,PM2.5,Part铆culas menores a 2.5 micr贸metros,2
+9,PMco,Part铆culas coarse,2
+10,BEN,Benceno,1
+11,TOL,Tolueno,1
+14,WSP,Velocidad del viento,3
+15,WDR,Direccion del viento,4
+16,TMP,Temperatura ambiente,5
+17,RH,Humedad relativa,6
+18,UVA,Radiaci贸n UV-A,17
+19,UVB,Radiaci贸n UV-B,7
+20,GR,Radiaci贸n global,7
+21,PAR,Radiaci贸n FA,8
+22,PA,Presi贸n Atmosf茅rica,9
+23,pH,Potencial de hidr贸geno,10
+24,PP,Precipitacion pluvial,11
+25,CE,Conductividad el茅ctrica,12
+26,SO4,Sulfato,"13,14"
+27,NO3,Nitrato,"13,14"
+28,Cl,Cloruro,"13,14"
+29,CO3,Carbonato,"13,14"
+30,H,Hidr贸geno,"13,14"
+31,NH4,Amonio,"13,14"
+32,Ca,Calcio,"13,14"
+33,Mg,Magnesio,"13,14"
+34,Na,Sodio,"13,14"
+35,K,Potasio,"13,14"
+36,PST,Part铆culas suspendidas totales,2
+37,PbPST,Plomo contenido en PST,2
+38,PbPM,Plomo contenido en PM10,2
+39,ETB,Etilbenceno,1
+40,XIL,Xilenos,1
