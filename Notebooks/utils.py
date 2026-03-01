@@ -9,6 +9,38 @@ from sklearn.preprocessing import RobustScaler
 import plotly.graph_objects as go
 import plotly.express as px
 
+import plotly.io as pio
+
+
+
+NUMERIC_FONT_FAMILY = "Consolas"
+TEXT_FONT_FAMILY = "Times New Roman"
+
+pio.templates["custom_dark"] = pio.templates["plotly_dark"]
+
+pio.templates["custom_dark"].layout.update(
+    font=dict(
+        family=TEXT_FONT_FAMILY
+    ),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    xaxis=dict(
+        tickfont=dict(family=NUMERIC_FONT_FAMILY)
+    ),
+    yaxis=dict(
+        tickfont=dict(family=NUMERIC_FONT_FAMILY)
+    ),
+    coloraxis=dict(
+        colorbar=dict(
+            tickfont=dict(family=NUMERIC_FONT_FAMILY)
+        )
+    )
+)
+
+pio.templates.default = "custom_dark"
+
+
+
 
 #Define global variables
 COLORMAP_VALUES = 'GnBu_r'
@@ -88,21 +120,46 @@ def get_data_gaps(data, bins = None, labels = None,
 
 
 
-def plot_heatmap(df, color_values_mode = "minmax", 
+def plot_heatmap(df,
                  df_gaps = None, 
+                 stations = None,
+                 query = None,
+                 color_values_mode = "minmax", 
                  plot_title = None,
-                 timestamp_mode = "days", timestamp_frequency = ['1', '15'],
+                 sort_cols = True,
+                 drop_empty_cols = False,
+                 timestamp_mode = "days", timestamp_frequency = [1, 15],
                  time_window_width = 31,
                  colormap_values = COLORMAP_VALUES,
                  colormap_gaps = COLORMAP_GAPS):
-    # -----------------------------------------------------------------------------------------
-    # General figure setup
 
-
-    # Create empty figure with y inverted for better visualization
-    fig = go.Figure()
-    fig.update_yaxes(autorange="reversed")
-
+    if query:
+        df = df.query(query).copy()
+        if df_gaps is not None:
+            df_gaps = df_gaps.query(query).copy()
+    
+    if stations is not None:
+        df = df[stations].copy()
+        if df_gaps is not None:
+            df_gaps = df_gaps[stations].copy()
+    
+    if sort_cols:
+        if stations is None:
+            print("Warning: sort_cols is True but stations is None. Columns will not be sorted.")
+        else:
+            # Sort columns by their mean values (descending)
+            stations = df.isna().sum()[stations].sort_values(ascending=True).index.tolist()
+            df = df[stations].copy()
+            if df_gaps is not None:
+                df_gaps = df_gaps[stations].copy()
+    
+    if drop_empty_cols:
+        # Delete columns with all NaN values
+        df = df.dropna(axis=1, how='all')
+        if df_gaps is not None:
+            df_gaps = df_gaps[df.columns].copy()
+        
+    
     array = df.values
     array_gaps = df_gaps.values if df_gaps is not None else None
     
@@ -119,6 +176,16 @@ def plot_heatmap(df, color_values_mode = "minmax",
         array_color = df_color.values
     else:
         array_color = array.copy()
+        
+        
+        
+    # -----------------------------------------------------------------------------------------
+    # General figure setup
+
+
+    # Create empty figure with y inverted for better visualization
+    fig = go.Figure()
+    fig.update_yaxes(autorange="reversed")
 
 
 
@@ -126,7 +193,7 @@ def plot_heatmap(df, color_values_mode = "minmax",
         # --- Timestamps each X hours
         # Add x axis labels at every hour in timestamp_frequency
         hours = timestamp_frequency
-        tickindex = df.index.hour.astype(str).isin(hours) & (df.index.minute == 0)
+        tickindex = df.index.hour.isin(hours) & (df.index.minute == 0)
         tickvals = df.index[tickindex]
         ticktext = df.index[tickindex].strftime('%Y-%m-%d %H')
     
@@ -134,7 +201,7 @@ def plot_heatmap(df, color_values_mode = "minmax",
         # --- Timmestamps each X day
         # Add x axis labels at every day in timestamp_frequency
         days = timestamp_frequency
-        tickindex=df.index.day.astype(str).isin(days)\
+        tickindex=df.index.day.isin(days)\
             & (df.index.hour == 0)
         tickvals=df.index[tickindex]
         ticktext=df.index[tickindex].strftime('%Y-%m-%d')
@@ -154,13 +221,13 @@ def plot_heatmap(df, color_values_mode = "minmax",
 
     # Update axis labels
     fig.update_xaxes(title_text='← Time →',
-                    title_font=dict(size=20, family=FAMILY_FONT),
-                    tickfont=dict(size=16, family=FAMILY_FONT),
+                    title_font=dict(size=20),
+                    tickfont=dict(size=16),
                     tickangle=30
                     )
     fig.update_yaxes(title_text='← Stations →',
-                    title_font=dict(size=20, family=FAMILY_FONT),
-                    tickfont=dict(size=16, family=FAMILY_FONT)
+                    title_font=dict(size=20),
+                    tickfont=dict(size=16)
                     )
 
     # Ad month annotations 
@@ -180,7 +247,7 @@ def plot_heatmap(df, color_values_mode = "minmax",
         yref="paper", y=1.05,  # posición relativa al canvas
         text=middle.strftime('%B').capitalize(),
         showarrow=False,
-        font=dict(size=20, color="gray", family=FAMILY_FONT),
+        font=dict(size=20, color="gray"),
         xanchor="center"
         )
 
@@ -227,88 +294,228 @@ def plot_heatmap(df, color_values_mode = "minmax",
     # -----------------------------------------------------------------------------------------
     # Plot gaps
 
-    gaps_fig = px.imshow(
-        array_gaps.T,
-        x=array_gaps.index,
-        y=array_gaps.columns,
-    )
+    if df_gaps is not None:
+        gaps_fig = px.imshow(
+            array_gaps.T,
+            x=df_gaps.index,
+            y=df_gaps.columns,
+        )
 
-    # Add hovertemplate to include array_color information
-    gaps_fig.update_traces(hovertemplate='''
-                            Date: %{x}<br>
-                            Station: %{y}<br>
-                            Value: Gap %{z}''')
+        # Add hovertemplate to include array_color information
+        gaps_fig.update_traces(hovertemplate='''
+                                Date: %{x}<br>
+                                Station: %{y}<br>
+                                Value: Gap %{z}''')
 
 
-    # Second trace use different color axis (coloraxis2)
-    gaps_fig.update_traces(
-        showscale=True,
-        coloraxis='coloraxis2'
-    )
+        # Second trace use different color axis (coloraxis2)
+        gaps_fig.update_traces(
+            showscale=True,
+            coloraxis='coloraxis2'
+        )
 
 
 
     # -----------------------------------------------------------------------------------------
     # Add colorbars
 
-    colorbars_font = titlefont=dict(size=20, 
-                                    color="gray",
-                                    family="Consolas")
-    colorbars_tickfont = tickfont=dict(size=17,
-                                    color="gray",
-                                    family="Consolas")
-
-    # Colorbar for values
-    fig.update_layout(
-        coloraxis1=dict(
-            colorbar=dict(title="Values",
-                        x=0.5, orientation='h', y=-0.3, yref = "paper",
-                        tickvals=np.linspace(0, 1, 11),
-                        ticktext=np.linspace(df.min().min(), 
-                                            df.max().max(), 
-                                            11).round(2).astype(str).tolist(),
-                        titlefont=colorbars_font,
-                        tickfont=colorbars_tickfont
-                        ),
-            colorscale=colormap_values # values
-            
-        ))
-
-    # Colorbar for gaps
-    fig.update_layout(
-        coloraxis2=dict(
-            colorbar=dict(title='_Gaps_', 
-                        x=0.5, orientation='h', y=-0.41, yref = "paper",
-                        titlefont=colorbars_font,
-                        tickfont=colorbars_tickfont
-                        ),
-            colorscale=colormap_gaps,  # gaps
-        ),
+    colorbars_font = dict(
+        size=20,
+        color="gray",
     )
 
+    colorbars_tickfont = dict(
+        size=17,
+        color="gray",
+    )
+
+    fig.update_layout(
+        coloraxis1=dict(
+            colorscale=colormap_values,
+            colorbar=dict(
+                title=dict(
+                    text="Values",
+                    font=colorbars_font
+                ),
+                x=0.5, y=-0.3, yref="paper", orientation="h",
+                tickvals=np.linspace(0, 1, 11),
+                ticktext=np.linspace(
+                    df.min().min(),
+                    df.max().max(),
+                    11
+                ).round(2).astype(str).tolist(),
+                tickfont=colorbars_tickfont
+            )
+        )
+    )
+
+    # Colorbar for gaps
+    if df_gaps is not None:
+        fig.update_layout(
+            coloraxis2=dict(
+                colorscale=colormap_gaps,
+                colorbar=dict(
+                    title=dict(
+                        text="_Gaps_",
+                        font=colorbars_font
+                    ),
+                    x=0.5, y=-0.41, yref="paper", orientation="h",
+                    tickfont=colorbars_tickfont
+                )
+            )
+        )
+    
+
     # Add plots to the main figure
-    for trace in gaps_fig.data:
-        fig.add_trace(trace)
+    
+    if df_gaps is not None:
+        for trace in gaps_fig.data:
+            fig.add_trace(trace)
+        
     for trace in values_fig.data:
         fig.add_trace(trace)
 
 
 
     # Add visibility menu
+    
+    if df_gaps is not None:
+        fig.update_layout(
+            updatemenus=[
+                dict(
+                    type="dropdown",
+                    direction="down",
+                    x=-0.1,
+                    y=1,
+                    buttons=[
+                        dict(label="Values & Gaps", method="restyle", args=[{"visible": [True, True]}]),
+                        dict(label="Values only", method="restyle", args=[{"visible": [False, True]}]),
+                        dict(label="Gaps only", method="restyle", args=[{"visible": [True, False]}])
+                    ]
+                )
+            ]
+        )
+
+
+    return fig
+
+
+
+
+
+def plot_timeseries_var_station(df,
+                                query = None,
+                                stations=None,
+                                var_name = '',
+                                drop_empty_cols = False,
+                                timestamp_mode = "days",
+                                timestamp_frequency = [1, 15],
+                                time_window_width = 31):
+    
+    if query is not None:
+        df = df.query(query).copy()
+        
+    if stations is not None:
+        df = df[stations].copy()
+        
+    if drop_empty_cols:
+        # Delete columns with all NaN values
+        df = df.dropna(axis=1, how='all')
+        
+        
+    fig = go.Figure()
+
+    # Add a line for each station
+    for station in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df[station],
+            mode='lines',
+            name=station
+        ))
+
+    # Update general layout
     fig.update_layout(
-        updatemenus=[
-            dict(
-                type="dropdown",
-                direction="down",
-                x=-0.1,
-                y=1,
-                buttons=[
-                    dict(label="Values & Gaps", method="restyle", args=[{"visible": [True, True]}]),
-                    dict(label="Values only", method="restyle", args=[{"visible": [False, True]}]),
-                    dict(label="Gaps only", method="restyle", args=[{"visible": [True, False]}])
-                ]
-            )
-        ]
+        title=f'{var_name.upper()} Time series',
+        title_font=dict(size=24),
+        xaxis_title='Date',
+        yaxis_title=f'{var_name.upper()} Value',
+        height=800,
+        width=1600
+    )
+
+ 
+ 
+    if timestamp_mode == "hours":
+        # --- Timestamps each X hours
+        # Add x axis labels at every hour in timestamp_frequency
+        hours = timestamp_frequency
+        tickindex = df.index.hour.isin(hours) & (df.index.minute == 0)
+        tickvals = df.index[tickindex]
+        ticktext = df.index[tickindex].strftime('%Y-%m-%d %H')
+    
+    elif timestamp_mode == "days":
+        # --- Timmestamps each X day
+        # Add x axis labels at every day in timestamp_frequency
+        days = timestamp_frequency
+        tickindex=df.index.day.isin(days)\
+            & (df.index.hour == 0)
+        tickvals=df.index[tickindex]
+        ticktext=df.index[tickindex].strftime('%Y-%m-%d')
+
+
+    fig.update_xaxes(tickvals= tickvals, ticktext= ticktext)
+
+    # Small window of time_window_width days from the start of the data for better visualization
+
+    start = df.index.min().strftime('%Y-%m-%d')
+    end = df.index.min() + pd.Timedelta(days=time_window_width)
+    fig.update_layout(xaxis_range=[start, end])
+
+
+    # Ad month annotations 
+    month_start = pd.date_range(start=start, periods=12, freq="MS")  
+
+    # Add a vertical line end of month
+    for inicio, middle in zip(month_start, 
+                            month_start + pd.Timedelta(days=14)):
+        fig.add_vline(x=inicio, 
+                    line_width=2, 
+                    line_dash="dashdot", 
+                    line_color="red")
+        
+        fig.add_annotation(
+        x=middle,
+        yref="paper", y=1.05,  # posición relativa al canvas
+        text=middle.strftime('%B').capitalize(),
+        showarrow=False,
+        font=dict(size=20, color="gray"),
+        xanchor="center"
+        )
+
+    # Change background to transparent (both paper and plot, change as needed)
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)')
+    
+    
+    # Add dashed grid lines with alpha 0.5
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='gray', griddash='dash')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='gray', griddash='dash')
+
+    # Update axis labels
+    fig.update_xaxes(title_font=dict(size=20 ),
+                    tickfont=dict(size=16),
+                    tickangle=30
+                    )
+    fig.update_yaxes(title_font=dict(size=20),
+                    tickfont=dict(size=16)
+                    )
+
+    # Update legend 
+    fig.update_layout(
+        legend=dict(
+            font=dict(size=16)
+        )
     )
 
 
