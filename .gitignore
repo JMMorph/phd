@@ -7,8 +7,11 @@ __pycache__/
 *.so
 
 # Own folders
-data/
-Others/BlogTOAR1/files/
+data/datasets
+data/cdmx/raw
+
+# Extensions
+*Zone.Identifier
 
 # Distribution / packaging
 .Python
