@@ -11,6 +11,7 @@ import plotly.express as px
 
 import plotly.io as pio
 
+from plotly.subplots import make_subplots
 
 
 NUMERIC_FONT_FAMILY = "Consolas"
@@ -106,9 +107,6 @@ def get_data_gaps(data, bins = None, labels = None,
         df_temp_gaps[columns_to_convert] = df_temp_gaps[columns_to_convert].astype(format_gaps)
             
     return df_temp_gaps.sort_index()
-
-
-
 
 
 
@@ -403,7 +401,7 @@ def plot_heatmap(df,
 
 
 
-def plot_timeseries_var_station(df,
+def plot_timeseries_var_station(df,                                 
                                 query = None,
                                 stations=None,
                                 var_name = '',
@@ -520,3 +518,247 @@ def plot_timeseries_var_station(df,
 
 
     return fig
+
+
+def plot_gap_analysis(df,
+                      stations = None,
+                      variable_column = 'variable',
+                      bar_mode = 'stack',
+                      subplot_pan_columns = 4,
+                      map_gap = None):
+
+    # variable_column = 'variable'
+    # bar_mode = 'stack'
+    # subplot_pan_columns = 4
+    # Count the number of elements equal to 0 for each column
+    
+    if stations is not None:
+        df = df[[variable_column] + stations].copy()
+    else:
+        stations = df.columns.tolist()
+        stations.remove(variable_column)
+        
+        
+    
+    variables = df[variable_column].unique().tolist()
+    zero_counts = df.isna().sum()
+
+    # Sort specified_order and remaining_columns by the number of zeros in descending order
+    specified_order = sorted(stations, key=lambda col: zero_counts[col], reverse=True)
+    
+    df = df[[variable_column] + specified_order].replace({np.nan: 0})
+
+    # Group by 'variable' and calculate the percentage of each value in each station
+    variable_groups = df.groupby(variable_column)
+
+    # Create a dictionary to store the percentage data for each variable
+    percentage_data = {}
+
+    for variable, group in variable_groups:
+        
+        group.sort_index(inplace=True)
+        # For each column identify with nan all values before the first 0
+        for col in group.columns:
+            temp = (group[col].copy()==0).cumsum() > 0
+            group[col] = group[col].where(temp, np.nan)
+        
+        
+        # Calculate the percentage for each station
+        percentage_data[variable] = group.drop(columns=variable_column).apply(
+            lambda x: x.value_counts(normalize=True) * 100
+        ).fillna(0)
+    
+    all_values = sorted(set(val for d in percentage_data.values() for val in d.index))
+    color_scale = px.colors.qualitative.Bold  # You can also use px.colors.sequential.OrRd, etc.
+
+    # If there are more values than colors in the scheme, they repeat
+    color_map = {val: color_scale[i % len(color_scale)] for i, val in enumerate(all_values)}
+
+    fig = make_subplots(
+        rows=len(variables), 
+        cols=1, 
+        shared_xaxes=True, 
+        vertical_spacing=0.02, 
+        shared_yaxes=True,
+    )
+
+    # Adjust the position of subplot titles
+    for i, annotation in enumerate(fig['layout']['annotations']):
+        annotation['y'] -= 0.005
+
+    # Iterate over variables and add traces to the subplot
+    for i, variable in enumerate(variables, start=1):
+        if variable in percentage_data:
+            data_var = percentage_data[variable].reset_index().melt(id_vars='index', var_name='Station', value_name='Percentage')
+            data_var.rename(columns={'index': 'Value'}, inplace=True)
+            
+            for value in data_var['Value'].unique():
+                filtered_data = data_var[data_var['Value'] == value]
+                
+                if map_gap is not None:
+                    legend_name = map_gap.get(str(int(value)), 'Nan')
+                else:
+                    legend_name = str(int(value))
+
+                # Add bar trace for each value, reference to the same legend group
+                fig.add_trace(
+                    go.Bar(
+                        x=filtered_data['Station'],
+                        y=filtered_data['Percentage'],
+                        name=legend_name,
+                        legendgroup=legend_name,
+                        showlegend=(i == 1),              
+                        marker_color=color_map[value],
+                        textposition='outside'
+                    ),
+                    row=i, col=1
+                )
+
+    # Update layout for all subplots
+    fig.update_yaxes(
+        side='left',
+        range=[0, 112],
+        ticksuffix='%',
+        tickvals=[0, 20, 40, 60, 80, 100],
+        showgrid=True,
+    )
+
+    # Set y-axis titles for each subplot (variable)
+    for i, variable in enumerate(variables, start=1):
+        fig.update_yaxes(
+            title_text=variable, 
+            title_font=dict(size=18),
+            tickfont=dict(size=14),
+            row=i, col=1
+        )
+        
+    # Update axis font
+    fig.update_xaxes(tickfont=dict(size=14))
+
+    # Update layout to show legend on the top of the plot
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            font=dict(size=18)
+        )
+    )
+
+    # Update overall figure layout
+    fig.update_layout(
+        height=150 * len(variables),  # Adjust height based on the number of variables
+        width=1000,
+        barmode=bar_mode
+    )
+
+
+
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='gray', griddash='solid')
+    fig.update_xaxes(showgrid=False)
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+
+    if bar_mode == 'group':
+        fig.update_xaxes(
+            range=[-0.5, subplot_pan_columns - 0.5],
+        )
+
+    return fig
+
+
+
+
+def plot_spatial_gap(df, 
+                     variable_column = 'variable', 
+                     frequency = 'month',
+                     agg_method = 'mean'):
+    
+    df_spatial_gaps = df.reset_index(drop=False).copy()
+    time_columns = ['datetime', 'year', 'month', 'day']
+    
+    for col in time_columns:
+        if col not in df_spatial_gaps.columns:
+            print (f'Column {col} must be in dataset')
+            return
+    
+    
+    
+    df_spatial_gaps = df.reset_index().rename(columns={variable_column:'var'}).melt(id_vars = ['datetime', 'year', 'month', 'day', 'var'])
+    df_spatial_gaps = df_spatial_gaps.groupby(['year','month','day','datetime','var']).agg({'value':'count'}).reset_index()
+    # Summary resampling
+
+
+    if frequency == 'year':
+        sampling = ['year']
+        time_format = '%Y'
+    elif frequency == 'month':
+        sampling = ['year', 'month']
+        time_format = '%Y-%m'
+    elif frequency == 'day':
+        sampling = ['year', 'month', 'day']
+        time_format = '%Y-%m-%d'
+
+    # Aggregate
+    df_spatial_gaps = df_spatial_gaps.groupby(sampling +['var']).agg({'value':agg_method}).reset_index()
+    df_spatial_gaps['time_res'] = df_spatial_gaps.apply(lambda x: '-'.join([str(x[r]).zfill(2) for r in sampling]), axis=1)
+    df_spatial_gaps = df_spatial_gaps.pivot_table(values='value', index = 'time_res', columns='var')
+
+    df_spatial_gaps.index = pd.to_datetime(df_spatial_gaps.index, format=time_format)
+    
+    
+
+    fig = go.Figure()
+
+    # Add a line for each variable
+    for var_name in df_spatial_gaps.columns:
+        fig.add_trace(go.Scatter(
+            x=df_spatial_gaps.index,
+            y=df_spatial_gaps[var_name],
+            mode='lines',
+            name=var_name
+        ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'Network coverage',
+        xaxis_title='Date',
+        yaxis_title=f'# Stations',
+        height=600,
+        width=1600
+    )
+
+
+    # --- Timmestamps 
+    # Add x axis labels at every month
+    if frequency == 'month':
+        tickindex=df_spatial_gaps.index.month.isin([1])
+        tickvals=df_spatial_gaps.index[tickindex]
+        ticktext=df_spatial_gaps.index[tickindex].strftime('%Y-%m-%d')
+
+    elif frequency == 'year':
+        tickindex=df_spatial_gaps.index.year.isin([1])
+        tickvals=df_spatial_gaps.index[tickindex]
+        ticktext=df_spatial_gaps.index[tickindex].strftime('%Y')
+
+    fig.update_xaxes(tickvals= tickvals, ticktext= ticktext)
+
+    start = df.index.min().strftime(time_format)
+    end = df.index.max().strftime(time_format)
+
+    fig.update_layout(xaxis_range=[start, end])
+
+        
+
+    # Add dashed grid lines with alpha 0.5
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='gray', griddash='dash')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='gray', griddash='dash')
+
+
+    # fig.update_layout(template='plotly_dark')
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    fig.show()
+
+
+

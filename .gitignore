@@ -9,6 +9,7 @@ __pycache__/
 # Own folders
 data/datasets
 data/cdmx/raw
+data/state_of_the_art_raw
 
 # Extensions
 *Zone.Identifier
